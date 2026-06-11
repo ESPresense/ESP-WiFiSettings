@@ -558,9 +558,12 @@ void WiFiSettingsClass::portal()
                     Serial.println(F(" WiFi networks found."));
                 }
 
-                http.sendContent(F(
+                 http.sendContent(F(
                     "<style>.s{display:none}</style>" // hide "scanning"
                     "<select name=ssid onchange=\"document.getElementsByName('password')[0].value=''\">"));
+
+                //empty row
+                http.sendContent(F("<option value='' selected> </option>"));
 
                 String current = slurp("/wifi-ssid");
                 bool found = false;
@@ -589,8 +592,17 @@ void WiFiSettingsClass::portal()
                 http.sendContent(_WSL_T.scanning_short);
                 http.sendContent("';\">");
                 http.sendContent(_WSL_T.rescan);
-                http.sendContent(F("</a><p><label>"));
-
+                http.sendContent(F("</a>"));
+                
+                //for hidden SSIDs
+                String wcurrent = slurp("/wifi-ssid2"); 
+                http.sendContent(F("<p><label>"));
+                http.sendContent("Manual SSID (for hidden SSIDs");                     
+                String opt = F(":<br><input name=ssid2 value='{ssid2}'></label><hr> ");  
+                opt.replace("{ssid2}", html_entities(wcurrent));
+                http.sendContent(opt);
+                                           
+                http.sendContent(F("<p><label>"));
                 http.sendContent(_WSL_T.wifi_password);
                 http.sendContent(F(":<br><input name=password value='"));
                 if (slurp("/wifi-password").length()) http.sendContent("##**##**##**");
@@ -628,7 +640,9 @@ void WiFiSettingsClass::portal()
     http.on("/", HTTP_POST, [this]()
             {
                 bool ok = true;
-                if (!spurt("/wifi-ssid", http.arg("ssid"))) ok = false;
+                               
+               spurt("/wifi-ssid", http.arg("ssid"));
+               spurt("/wifi-ssid2", http.arg("ssid2"));
 
                 if (WiFiSettingsLanguage::multiple())
                 {
@@ -700,10 +714,16 @@ bool WiFiSettingsClass::connect(bool portal, int wait_seconds) {
     WiFi.mode(WIFI_STA);
 
     String ssid = slurp("/wifi-ssid");
+    String ssid2 = slurp("/wifi-ssid2");
     String pw = slurp("/wifi-password");
-    if (ssid.length() == 0) {
-        Serial.println(F("First contact!\n"));
+
+    if (ssid.length() == 0 && ssid2.length() == 0) {
+        Serial.println(F("First contact! No SSID.\n"));
         this->portal();
+    }
+
+    if (ssid2.length() > 0){
+        ssid = ssid2;
     }
 
     Serial.print(F("Connecting to WiFi SSID '"));
